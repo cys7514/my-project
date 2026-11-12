@@ -1,0 +1,16 @@
+{
+  "name": "number-baseball",
+  "version": "1.0.0",
+  "description": "웹캠 손가락으로 하는 숫자야구 게임 (Electron + MediaPipe)",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "models": "node scripts/download-models.js"
+  },
+  "devDependencies": {
+    "electron": "^45.1.0"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^1.2.0"
+  }
+}
