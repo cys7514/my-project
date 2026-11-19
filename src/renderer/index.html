@@ -37,10 +37,11 @@
         <ul>
           <li>컴퓨터가 <b>0 ~ 9</b> 중 서로 다른 숫자를 고른 자리 수만큼 숨겨요.</li>
           <li>손가락을 펴면 <b>바로</b> 숫자 <b>하나</b>가 입력돼요. 한 개씩 차례대로 보여 주세요. (두 손 합계, <b>주먹 = 0</b>)</li>
-          <li>숫자를 다 넣으면 <b>두 손으로 큰 동그라미 ◯</b> 를 만드세요 → 결과가 나와요.<br>(두 손 손가락 끝끼리, 엄지 끝끼리 맞대기)</li>
-          <li><b>두 손목을 엇갈려 엑스 ✕</b> 를 만들면 입력한 숫자가 <b>모두</b> 지워져요.</li>
+          <li>숫자를 다 넣으면 <b>두 손으로 둥근 동그라미 ◯</b> 를 만드세요 → 결과가 나와요.<br>(엄지 끝끼리 맞대고, 나머지 손가락은 서로를 향해 <b>둥글게 구부리기</b>)</li>
+          <li><b>두 팔(손목)을 가슴 앞에서 엇갈려 엑스 ✕</b> 를 만들면 입력한 숫자가 <b>모두</b> 지워져요.<br>(두 손목이 <b>화면 안에</b> 보여야 해요)</li>
           <li><b>양손바닥</b>(손가락 10개)을 보여 주면 마지막 숫자 <b>하나</b>가 지워져요.</li>
-          <li><b>S 스트라이크</b> = 숫자와 자리 모두 맞음 · <b>B 볼</b> = 숫자는 있지만 자리가 다름 · <b>O 아웃</b> = 맞는 숫자가 하나도 없음</li>
+          <li><b>B 볼</b> = 숫자는 있지만 자리가 다름 · <b>S 스트라이크</b> = 숫자와 자리 모두 맞음 · <b>O 아웃</b> = 맞는 숫자가 하나도 없음</li>
+          <li>자리 수만큼 스트라이크(3자리면 3스트라이크, 4자리면 4스트라이크…)가 나오면 정답!</li>
           <li>기회는 무제한! 대신 <b>1번 만에 맞히면 10점</b>, 2번 9점 … 10번째부터는 1점</li>
           <li>점수를 모아 <b>목표 점수</b>에 도달하면 게임 끝!</li>
         </ul>
@@ -48,38 +49,39 @@
     </div>
   </div>
 
-  <!-- ===== 2. 게임 화면: 왼쪽 카메라, 오른쪽 게임판 ===== -->
-  <div id="game" class="layout" hidden>
-    <main class="stage">
-      <video id="video" autoplay playsinline muted></video>
-      <canvas id="canvas"></canvas>
-      <div id="status" class="status"></div>
-    </main>
+  <!-- ===== 2. 게임 화면: 위쪽 정보 막대 / 아래 왼쪽 카메라, 오른쪽 결과표 ===== -->
+  <div id="game" class="game" hidden>
+    <!-- 위쪽: 점수 · 라운드 · 이번 시도 · 입력한 숫자 -->
+    <div class="topbar">
+      <section class="scorebox">
+        <div><span class="label">점수</span><b id="total"></b></div>
+        <div><span class="label">라운드</span><b id="round"></b></div>
+        <div><span class="label">이번 시도</span><b id="worth"></b></div>
+      </section>
 
-    <aside class="panel">
-      <!-- 위쪽: 고정 (점수, 숫자 입력칸) -->
-      <div class="play-top">
-        <section class="scorebox">
-          <div><span class="label">점수</span><b id="total"></b></div>
-          <div><span class="label">라운드</span><b id="round"></b></div>
-          <div><span class="label">이번 시도</span><b id="worth"></b></div>
-        </section>
+      <section class="input-box">
+        <h2>입력한 숫자 <span id="recognized" class="recognized"></span></h2>
+        <div id="slots" class="slots"></div>
+      </section>
 
-        <section>
-          <h2>입력한 숫자 <span id="recognized" class="recognized"></span></h2>
-          <div id="slots" class="slots"></div>
-          <p id="message" class="message"></p>
-        </section>
-      </div>
+      <p id="message" class="message"></p>
+    </div>
 
-      <!-- 아래쪽: 스크롤 (판정, 판 끝, 던진 공 기록) -->
-      <div id="play-scroll" class="play-scroll">
+    <div class="layout">
+      <main class="stage">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas"></canvas>
+        <div id="status" class="status"></div>
+      </main>
+
+      <!-- 오른쪽: 결과를 한눈에 -->
+      <aside class="panel">
         <section class="board">
-          <h2>판정</h2>
+          <h2>방금 판정</h2>
           <div class="lamps">
-            <div class="lamp-row s"><b>S</b><span class="lamp-name">스트라이크</span><span id="lamp-s" class="lamp-num">-</span></div>
-            <div class="lamp-row b"><b>B</b><span class="lamp-name">볼</span><span id="lamp-b" class="lamp-num">-</span></div>
-            <div class="lamp-row o"><b>O</b><span class="lamp-name">아웃</span><span id="lamp-o" class="lamp-num">-</span></div>
+            <div class="lamp b"><b>B</b><span id="lamp-b" class="lamp-num">-</span><span class="lamp-name">볼</span></div>
+            <div class="lamp s"><b>S</b><span id="lamp-s" class="lamp-num">-</span><span class="lamp-name">스트라이크</span></div>
+            <div class="lamp o"><b>O</b><span id="lamp-o" class="lamp-num">-</span><span class="lamp-name">아웃</span></div>
           </div>
           <p id="verdict" class="verdict"></p>
         </section>
@@ -92,22 +94,21 @@
         </section>
 
         <section class="history-box">
-          <h2>이번 판에 던진 공 (최근 것이 위)</h2>
-          <ol id="history" class="history"></ol>
-          <p id="history-empty" class="muted">아직 없어요. 손가락으로 첫 숫자를 보여 주세요!</p>
+          <h2>이번 판 결과표</h2>
+          <div id="history-scroll" class="history-scroll">
+            <table class="history">
+              <thead>
+                <tr><th>#</th><th>입력</th><th class="b">B</th><th class="s">S</th><th class="o">O</th><th>결과</th></tr>
+              </thead>
+              <tbody id="history"></tbody>
+            </table>
+            <p id="history-empty" class="muted">아직 없어요. 손가락으로 첫 숫자를 보여 주세요!</p>
+          </div>
         </section>
 
-        <section class="help">
-          <h2>손 모양</h2>
-          <ul>
-            <li>손가락 0 ~ 9개 = 숫자 입력</li>
-            <li>두 손 동그라미 ◯ = 결과 보기 (숫자를 다 넣은 뒤)</li>
-            <li>두 손목 엑스 ✕ = 모두 지우기</li>
-            <li>양손바닥 = 하나 지우기 · 맞힌 뒤에는 다음 판</li>
-          </ul>
-        </section>
-      </div>
-    </aside>
+        <p class="hint">손가락 0 ~ 9 = 숫자 · 두 손 ◯ = 결과 · 손목 ✕ = 모두 지우기 · 양손바닥 = 하나 지우기 / 다음 판</p>
+      </aside>
+    </div>
   </div>
 
   <script type="module" src="app.js"></script>

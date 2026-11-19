@@ -31,16 +31,16 @@ export function judge(secret, guess) {
   return { strike, ball, out, correct: strike === secret.length };
 }
 
-// 약자 ("1S 2B", "O")
+// 약자 ("2B 1S", "O") → 볼을 먼저, 스트라이크를 나중에
 export function shortText({ strike, ball, out }) {
   if (out) return 'O';
-  return [strike && `${strike}S`, ball && `${ball}B`].filter(Boolean).join(' ');
+  return [ball && `${ball}B`, strike && `${strike}S`].filter(Boolean).join(' ');
 }
 
-// 풀어서 ("1스트라이크 2볼", "아웃")
+// 풀어서 ("2볼 1스트라이크", "아웃") → 볼을 먼저, 스트라이크를 나중에
 export function fullText({ strike, ball, out }) {
   if (out) return '아웃';
-  return [strike && `${strike}스트라이크`, ball && `${ball}볼`].filter(Boolean).join(' ');
+  return [ball && `${ball}볼`, strike && `${strike}스트라이크`].filter(Boolean).join(' ');
 }
 
 // 게임 전체 (난이도, 목표 점수, 모은 점수)

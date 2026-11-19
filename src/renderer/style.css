@@ -82,58 +82,6 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
-/* ----- 화면 나누기: 왼쪽 카메라, 오른쪽 게임판 ----- */
-.layout {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-
-.stage {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#video,
-#canvas {
-  position: absolute;
-  max-width: 100%;
-  max-height: 100%;
-}
-
-/* 거울처럼 보이게 좌우 뒤집기 (손 그림은 app.js에서 같이 뒤집음) */
-#video {
-  transform: scaleX(-1);
-}
-
-.status {
-  position: absolute;
-  bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 8px 16px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.6);
-  font-size: 15px;
-}
-
-.status:empty {
-  display: none;
-}
-
-/* ----- 오른쪽 게임판 ----- */
-.panel {
-  width: 400px;
-  display: flex;
-  flex-direction: column;
-  background: var(--panel);
-  border-left: 1px solid var(--line);
-  overflow: hidden;
-}
 
 /* ----- 시작 화면 (카메라 없이 설정만) ----- */
 .setup {
@@ -171,33 +119,6 @@ kbd {
   font-size: 14px;
 }
 
-/* 게임 화면: 위쪽은 고정, 아래쪽만 스크롤 */
-
-.play-top {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 18px 18px 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.play-scroll {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  padding: 16px 18px 18px;
-  overflow-y: auto;
-}
-
-.panel h2,
-.setup h2.help-title {
-  margin: 0 0 10px;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: normal;
-}
 
 /* 시작 화면 고르기 버튼 */
 .choices {
@@ -245,18 +166,44 @@ kbd {
   filter: brightness(1.1);
 }
 
-/* 점수판 */
+
+/* ----- 게임 화면: 위쪽 정보 막대 + 아래(왼쪽 카메라, 오른쪽 결과표) ----- */
+.game {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 위쪽 정보 막대: 점수 · 라운드 · 이번 시도 · 입력한 숫자 */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 28px;
+  padding: 10px 18px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar h2 {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: normal;
+}
+
 .scorebox {
   display: flex;
   gap: 8px;
 }
 
 .scorebox div {
-  flex: 1;
+  min-width: 92px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
 }
@@ -267,11 +214,10 @@ kbd {
 }
 
 .scorebox b {
-  font-size: 18px;
+  font-size: 20px;
   font-variant-numeric: tabular-nums;
 }
 
-/* 입력한 숫자 칸 */
 .recognized {
   margin-left: 6px;
   color: var(--accent);
@@ -284,15 +230,14 @@ kbd {
 }
 
 .slot {
-  flex: 1;
-  max-width: 72px;
-  height: 84px;
+  width: 56px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 2px dashed var(--line);
-  border-radius: 12px;
-  font-size: 48px;
+  border-radius: 10px;
+  font-size: 38px;
   font-weight: bold;
 }
 
@@ -306,10 +251,11 @@ kbd {
 }
 
 .message {
-  min-height: 1.4em;
-  margin: 10px 0 0;
+  flex: 1;
+  min-width: 220px;
+  margin: 0;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .message.warn {
@@ -317,47 +263,108 @@ kbd {
   font-weight: bold;
 }
 
-/* 판정 S · B · O */
-.lamps {
+/* 아래: 왼쪽 카메라, 오른쪽 결과표 */
+.layout {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
 }
 
-.lamp-row {
+.stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
+  justify-content: center;
+}
+
+#video,
+#canvas {
+  position: absolute;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* 거울처럼 보이게 좌우 뒤집기 (손 그림은 app.js에서 같이 뒤집음) */
+#video {
+  transform: scaleX(-1);
+}
+
+.status {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
   border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: 15px;
+}
+
+.status:empty {
+  display: none;
+}
+
+
+/* ----- 오른쪽: 결과를 한눈에 ----- */
+.panel {
+  width: 430px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: normal;
+}
+
+/* 방금 판정: B · S · O 세 칸 */
+.lamps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.lamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  border-radius: 10px;
   background: #1f252e;
 }
 
-.lamp-row b {
-  width: 1.2em;
-  font-size: 22px;
-}
-
-.lamp-name {
-  color: var(--muted);
-  font-size: 14px;
+.lamp b {
+  font-size: 18px;
 }
 
 .lamp-num {
-  margin-left: auto;
-  font-size: 26px;
+  font-size: 30px;
   font-weight: bold;
   font-variant-numeric: tabular-nums;
 }
 
-.lamp-row.s b, .lamp-row.s.on .lamp-num { color: var(--strike); }
-.lamp-row.b b, .lamp-row.b.on .lamp-num { color: var(--ball); }
-.lamp-row.o b, .lamp-row.o.on .lamp-num { color: var(--out); }
+.lamp-name {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.lamp.b b, .lamp.b.on .lamp-num { color: var(--ball); }
+.lamp.s b, .lamp.s.on .lamp-num { color: var(--strike); }
+.lamp.o b, .lamp.o.on .lamp-num { color: var(--out); }
 
 .verdict {
   min-height: 1.4em;
   margin: 10px 0 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: bold;
 }
 
@@ -395,24 +402,47 @@ kbd {
   font-size: 14px;
 }
 
-/* 던진 공 기록 */
-.history {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+
+/* 이번 판 결과표 */
+.history-box {
+  flex: 1;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
 }
 
-.history li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--line);
+.history-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.history {
+  width: 100%;
+  border-collapse: collapse;
   font-variant-numeric: tabular-nums;
 }
 
+.history th {
+  position: sticky;
+  top: 0;
+  padding: 8px 6px;
+  background: var(--bar);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.history td {
+  padding: 7px 6px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  font-size: 17px;
+}
+
 .history .num {
-  width: 1.8em;
   color: var(--muted);
   font-size: 13px;
 }
@@ -420,25 +450,36 @@ kbd {
 .history .guess {
   font-size: 20px;
   font-weight: bold;
-  letter-spacing: 4px;
+  letter-spacing: 3px;
 }
 
-.history .result {
-  margin-left: auto;
-  text-align: right;
+.history .zero {
+  color: #4a5260;
+}
+
+.history th.b, .history td.b { color: var(--ball); }
+.history th.s, .history td.s { color: var(--strike); }
+.history th.o, .history td.o { color: var(--out); }
+.history td.zero { color: #4a5260; }
+
+.history .res {
+  font-size: 14px;
   font-weight: bold;
 }
 
-.history .full {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: normal;
+.history tr.correct .res { color: var(--strike); }
+.history tr.latest td { background: rgba(255, 159, 28, 0.12); }
+
+.history-scroll .muted {
+  padding: 12px;
 }
 
-.result .s { color: var(--strike); }
-.result .b { color: var(--ball); }
-.result .o { color: var(--out); }
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
 
 .muted {
   margin: 0;

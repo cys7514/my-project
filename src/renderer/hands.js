@@ -46,19 +46,22 @@ function straightness(a, b, c) {
 }
 
 // 손가락이 펴졌는지 [엄지, 검지, 중지, 약지, 새끼] (worldLandmarks = 실제 크기 3D 좌표)
-// 8이 9로 나오는 문제 → 접힌 손가락(특히 엄지)을 펴진 걸로 세지 않게 기준을 엄격하게 함
-const THUMB_STRAIGHT = 0.6;    // 엄지 마디가 이만큼 곧아야 펴짐
+// 진짜 웹캠 점검 기록으로 맞춘 기준
+//  · 검지 ~ 새끼: 펴면 곧음 0.78 이상, 접으면 0.25 이하 → 0.5로 충분히 구분됨
+//  · 엄지: 펴면 손바닥 반대쪽으로 벌어져서 엄지 끝이 새끼손가락 뿌리(17)에서 멀어짐
+//          → "엄지 마디가 곧음(0.8 이상) + 엄지 끝이 새끼 뿌리에서 손바닥 길이 x 0.87 이상 떨어짐"이면 펴짐
+//          (점검 2 기록: 엄지 정확도 73% → 91%, 숫자 15단계 모두 정답)
+const THUMB_STRAIGHT = 0.8;    // 엄지 마디가 이만큼 곧아야 펴짐
 const FINGER_STRAIGHT = 0.5;   // 나머지 손가락이 이만큼 곧아야 펴짐
-const THUMB_AWAY = 0.6;        // 엄지 끝이 검지 뿌리에서 손바닥 길이의 이만큼 떨어져야 펴짐
+const THUMB_OPEN = 0.87;       // 엄지 끝이 새끼 뿌리에서 손바닥 길이의 이만큼 떨어져야 펴짐
 
 function fingersUp(world) {
   const wrist = world[0];
   const palm = dist(world[0], world[9]); // 손바닥 길이 (손목 ~ 중지 뿌리)
 
-  // 엄지: ① 엄지 마디(2-3-4)가 곧고 ② 끝이 검지 뿌리(5)에서 충분히 떨어져 있고 ③ 새끼 뿌리(17)에서 멀어지는 쪽
+  // 엄지: ① 엄지 마디(2-3-4)가 곧고 ② 끝이 새끼 뿌리(17)에서 충분히 떨어져 있음 (손바닥 밖으로 벌어짐)
   const thumb = straightness(world[2], world[3], world[4]) > THUMB_STRAIGHT
-             && dist(world[4], world[5]) > palm * THUMB_AWAY
-             && dist(world[4], world[17]) > dist(world[3], world[17]);
+             && dist(world[4], world[17]) > palm * THUMB_OPEN;
 
   // 나머지: ① 끝이 둘째 마디보다 손목에서 멀고 ② 뿌리-둘째 마디-끝이 곧게 펴져 있음
   const others = [1, 2, 3, 4].map((f) => {

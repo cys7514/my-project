@@ -13,8 +13,11 @@ const POSE_MS = 300;
 const PALMS_MS = 600;
 // 두 손 모양을 만드는 중에 손이 잠깐 안 보여도 이 시간까지는 끊기지 않은 걸로 봄 (0.3초)
 const POSE_GAP_MS = 300;
-// 손가락으로 숫자를 하나 넣거나 지운 뒤 이 시간 동안은 다음 손가락 수를 인식하지 않음 (1초)
-const AFTER_INPUT_MS = 1000;
+// 몸 인식(엑스)은 이만큼의 화면마다 한 번 (3 = 3화면에 한 번)
+const BODY_EVERY = 3;
+// 손가락으로 숫자를 하나 넣거나 지운 뒤 이 시간 동안은 다음 손가락 수를 인식하지 않음 (0.75초)
+// → 쉬는 시간 0.75초 + 다음 숫자 확인 0.25초(STABLE_MS) = 다음 숫자까지 약 1초
+const AFTER_INPUT_MS = 750;
 
 const $ = (id) => document.getElementById(id);
 const video = $('video');
@@ -29,6 +32,7 @@ let vision = null;                 // MediaPipe (처음 시작할 때 한 번만
 let handsReady = false;
 let running = false;               // 카메라가 켜져서 인식 중인지
 let lastVideoTime = -1;
+let frameNo = 0;
 let frames = 0;
 let fpsTime = performance.now();
 
@@ -122,13 +126,18 @@ function clearBoard() {
   $('recognized').textContent = '';
 }
 
-function resultHtml(p) {
-  if (p.out) return '<span class="o">O</span><span class="full">아웃</span>';
-  const parts = [];
-  if (p.strike) parts.push(`<span class="s">${p.strike}S</span>`);
-  if (p.ball) parts.push(`<span class="b">${p.ball}B</span>`);
-  const full = p.correct ? `${game.fullText(p)} · 정답!` : game.fullText(p);
-  return `${parts.join(' ')}<span class="full">${full}</span>`;
+// 결과표 한 줄: 번호 | 입력 | B | S | O | 결과
+function historyRow(p, i, isLatest) {
+  const cell = (cls, v) => `<td class="${v ? cls : `${cls} zero`}">${v}</td>`;
+  const classes = [p.correct && 'correct', isLatest && 'latest'].filter(Boolean).join(' ');
+  return `<tr class="${classes}">`
+    + `<td class="num">${i + 1}</td>`
+    + `<td class="guess">${p.guess.join('')}</td>`
+    + cell('b', p.ball)
+    + cell('s', p.strike)
+    + cell('o', p.out ? 1 : 0)
+    + `<td class="res">${p.correct ? '정답!' : '아님'}</td>`
+    + '</tr>';
 }
 
 function render() {
@@ -153,12 +162,13 @@ function render() {
     slot.classList.toggle('next', !match.solved && i === match.input.length);
   });
 
-  // 던진 공 기록 (최근 것이 위로)
+  // 이번 판 결과표 (1번부터 차례대로, 방금 것은 주황색으로 표시)
   $('history').innerHTML = match.history
-    .map((h, i) => `<li><span class="num">${i + 1}</span><span class="guess">${h.guess.join('')}</span><span class="result">${resultHtml(h)}</span></li>`)
-    .reverse()
+    .map((h, i) => historyRow(h, i, i === tries - 1))
     .join('');
   $('history-empty').hidden = tries > 0;
+  const scroller = $('history-scroll');
+  scroller.scrollTop = scroller.scrollHeight; // 방금 결과가 보이게 맨 아래로
 
   // 판이 끝났을 때
   const ending = $('ending');
@@ -170,7 +180,7 @@ function render() {
     $('ending-next').textContent = '양손바닥(손가락 10개)을 보여 주면 처음으로';
     $('next').textContent = '처음으로';
   } else if (match.solved) {
-    $('ending-title').textContent = '🎉 홈런! 정답이에요';
+    $('ending-title').textContent = `🎉 ${match.digits}스트라이크! 정답이에요`;
     $('ending-text').textContent = `정답 ${match.secret.join('')} · ${tries}번 만에 맞혀서 +${match.lastPoints}점`;
     $('ending-next').textContent = '양손바닥(손가락 10개)을 보여 주면 다음 판';
     $('next').textContent = '다음 판';
@@ -201,7 +211,6 @@ function submitGuess() {
   const pitch = game.submit(match);
   if (!pitch) return;
   showBoard(pitch);
-  $('play-scroll').scrollTop = 0; // 판정이 보이게 아래쪽 스크롤을 맨 위로
   setMessage(pitch.correct ? '' : '다시 첫 번째 숫자부터 보여 주세요');
   render();
 }
@@ -258,7 +267,7 @@ function done(label, run, now) {
 // 두 손 동그라미 · 엑스 확인 → 모양이 보이는 동안 true (그동안 손가락 수는 숫자로 안 셈)
 function updatePose(result, now) {
   const aspect = canvas.width / canvas.height;
-  let name = poses.isX(result, aspect) ? 'x' : poses.isCircle(result, aspect) ? 'circle' : null;
+  let name = poses.isX() ? 'x' : poses.isCircle(result, aspect) ? 'circle' : null;
   if (name) poseLastSeen = now;
   // 손을 엇갈리면 손 하나가 잠깐 가려질 수 있어서, 0.3초까지는 같은 모양이 계속되는 걸로 봄
   else if (pose && now - poseLastSeen < POSE_GAP_MS) name = pose;
@@ -356,6 +365,13 @@ function drawHud(now, handCount) {
   const seen = `보이는 손 ${handCount}개`;
   ctx.strokeText(seen, x, y + r + 58);
   ctx.fillText(seen, x, y + r + 58);
+
+  // 손목이 화면 안에 보이는지 (엑스는 두 손목이 화면 안에서 엇갈려야 알아볼 수 있어요)
+  const wristsIn = poses.wristsVisible();
+  ctx.fillStyle = wristsIn ? '#3ddc97' : '#c8d0da';
+  const wristText = wristsIn ? '손목 2개 보임' : '손목이 화면 밖';
+  ctx.strokeText(wristText, x, y + r + 84);
+  ctx.fillText(wristText, x, y + r + 84);
   ctx.restore();
 }
 
@@ -367,6 +383,8 @@ function loop() {
 
   const now = performance.now();
   const result = hands.detect(video, now);
+  // 몸 인식(엑스용)은 3화면에 한 번만 (두 가지를 매번 다 하면 느려져서)
+  if (frameNo++ % BODY_EVERY === 0) poses.detectBody(video, now);
 
   const posing = updatePose(result, now);
   if (posing) lastLabel = poseDone ? lastLabel : '';
@@ -436,6 +454,7 @@ async function startCamera() {
     try {
       vision = await FilesetResolver.forVisionTasks('/node_modules/@mediapipe/tasks-vision/wasm');
       await hands.load(makeCreate());
+      await poses.load(makeCreate()); // 몸 인식 (엑스 = 팔 엇갈림)
       handsReady = true;
     } catch (err) {
       console.error(err);

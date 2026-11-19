@@ -1,4 +1,4 @@
-// MediaPipe 손 인식 모델을 models 폴더에 내려받기 (npm run models)
+// MediaPipe 손 · 몸 인식 모델을 models 폴더에 내려받기 (npm run models)
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
@@ -6,6 +6,8 @@ const path = require('path');
 const MODELS = {
   'hand_landmarker.task':
     'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+  'pose_landmarker_lite.task':
+    'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
 };
 
 const dir = path.join(__dirname, '..', 'models');
