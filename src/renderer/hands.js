@@ -30,7 +30,30 @@ export async function load(create) {
 }
 
 export function detect(video, time) {
-  return landmarker.detectForVideo(video, time);
+  return removeDuplicateHand(landmarker.detectForVideo(video, time));
+}
+
+// 한 손을 두 번 겹쳐서 잡는 경우가 있음 (1을 보여 줬는데 1 + 1 = 2로 세어짐)
+// 점검 기록: 진짜 두 손은 손 중심끼리 손바닥 길이의 0.98배 이상 떨어져 있었고, 겹쳐 잡힌 손은 0.08 ~ 0.41배
+// → 0.7배보다 가까우면 같은 손으로 보고, 더 확실한(점수가 높은) 손 하나만 남김
+const SAME_HAND = 0.7;
+
+function removeDuplicateHand(result) {
+  if (result.landmarks.length !== 2) return result;
+  const [a, b] = result.landmarks;
+  const ids = [0, 5, 9, 13, 17];
+  const center = (h) => ({ x: ids.reduce((s, i) => s + h[i].x, 0) / 5, y: ids.reduce((s, i) => s + h[i].y, 0) / 5 });
+  const gap = Math.hypot(center(a).x - center(b).x, center(a).y - center(b).y);
+  const palm = (Math.hypot(a[0].x - a[9].x, a[0].y - a[9].y) + Math.hypot(b[0].x - b[9].x, b[0].y - b[9].y)) / 2;
+  if (gap >= palm * SAME_HAND) return result;
+
+  const score = (i) => result.handedness[i]?.[0]?.score ?? 0;
+  const keep = score(0) >= score(1) ? 0 : 1;
+  return {
+    landmarks: [result.landmarks[keep]],
+    worldLandmarks: [result.worldLandmarks[keep]],
+    handedness: [result.handedness[keep]],
+  };
 }
 
 function dist(a, b) {
@@ -54,14 +77,18 @@ function straightness(a, b, c) {
 const THUMB_STRAIGHT = 0.8;    // 엄지 마디가 이만큼 곧아야 펴짐
 const FINGER_STRAIGHT = 0.5;   // 나머지 손가락이 이만큼 곧아야 펴짐
 const THUMB_OPEN = 0.87;       // 엄지 끝이 새끼 뿌리에서 손바닥 길이의 이만큼 떨어져야 펴짐
+const THUMB_OFF_MIDDLE = 0.5;  // 엄지 끝이 중지 둘째 마디에서 손바닥 길이의 이만큼 떨어져야 펴짐
 
 function fingersUp(world) {
   const wrist = world[0];
   const palm = dist(world[0], world[9]); // 손바닥 길이 (손목 ~ 중지 뿌리)
 
   // 엄지: ① 엄지 마디(2-3-4)가 곧고 ② 끝이 새끼 뿌리(17)에서 충분히 떨어져 있음 (손바닥 밖으로 벌어짐)
+  //       ③ 끝이 중지 둘째 마디(10)에서도 떨어져 있음 (숫자 1처럼 엄지를 중지 위에 얹으면 0.26 ~ 0.34,
+  //          진짜 펴면 0.63 이상 → 1이 2로 세어지는 것 막기)
   const thumb = straightness(world[2], world[3], world[4]) > THUMB_STRAIGHT
-             && dist(world[4], world[17]) > palm * THUMB_OPEN;
+             && dist(world[4], world[17]) > palm * THUMB_OPEN
+             && dist(world[4], world[10]) > palm * THUMB_OFF_MIDDLE;
 
   // 나머지: ① 끝이 둘째 마디보다 손목에서 멀고 ② 뿌리-둘째 마디-끝이 곧게 펴져 있음
   const others = [1, 2, 3, 4].map((f) => {
@@ -82,6 +109,30 @@ export function countFingers(result) {
   });
   return total;
 }
+
+// 양손 가위 (가위바위보의 가위: 엄지 + 검지를 편 L자 모양) → 검지가 가리키는 방향
+//  · 엄지는 인식이 가끔 흔들려서, 엄지는 펴졌든 접혔든 상관없이 "검지만 펴고 중지 · 약지 · 새끼는 접힘"이면 가위
+//  'left' · 'right' : 두 손 모두 검지로 같은 쪽 옆을 가리킴 (화면에서 보이는 방향 = 거울 화면 기준)
+//  'up'             : 가위 모양이지만 옆을 가리키지 않음
+//  null             : 양손 가위가 아님
+export function scissors(result, aspect) {
+  if (result.landmarks.length !== 2) return null;
+  const isL = result.worldLandmarks.every((w) => {
+    const [, index, middle, ring, pinky] = fingersUp(w);
+    return index && !middle && !ring && !pinky;
+  });
+  if (!isL) return null;
+
+  const dirs = result.landmarks.map((p) => {
+    // 검지 뿌리(5) → 검지 끝(8)
+    const vx = (p[8].x - p[5].x) * aspect;
+    const vy = p[8].y - p[5].y;
+    if (Math.abs(vx) < Math.abs(vy)) return 'up'; // 옆보다 위아래를 더 가리킴
+    return vx > 0 ? 'left' : 'right';             // 카메라 원본은 거울 화면과 좌우가 반대
+  });
+  return dirs[0] === dirs[1] && dirs[0] !== 'up' ? dirs[0] : 'up';
+}
+
 // 손 뼈대 그리기 (펴진 손가락 끝은 손가락 색, 접힌 손가락 끝은 회색 동그라미)
 export function draw(result, drawingUtils, ctx) {
   result.landmarks.forEach((points, i) => {

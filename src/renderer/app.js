@@ -158,8 +158,8 @@ function render() {
   [...slots.children].forEach((slot, i) => {
     const n = shownDigits[i];
     slot.textContent = n ?? '';
-    slot.classList.toggle('filled', n !== undefined);
-    slot.classList.toggle('next', !match.solved && i === match.input.length);
+    slot.classList.toggle('filled', n !== null && n !== undefined);
+    slot.classList.toggle('cursor', !match.solved && i === match.cursor); // ▼ 화살표가 있는 자리
   });
 
   // 이번 판 결과표 (1번부터 차례대로, 방금 것은 주황색으로 표시)
@@ -193,16 +193,22 @@ function inputDigit(n) {
   $('recognized').textContent = `· 인식된 숫자 ${n}`;
   if (!r.ok) {
     setMessage(r.message, 'warn');
+  } else if (r.replaced !== null) {
+    const more = game.isFull(match) ? ' · 다 됐으면 두 손 동그라미 ◯' : '';
+    setMessage(`${r.at + 1}번째 자리를 ${r.replaced} → ${n}(으)로 바꿨어요${more}`);
   } else if (game.isFull(match)) {
-    setMessage('다 넣었어요! 두 손으로 동그라미 ◯ = 결과, 두 손목 엑스 ✕ = 모두 지우기', 'warn');
+    setMessage('다 넣었어요! 두 손 동그라미 ◯ = 결과 · 고치려면 가위로 칸 고르기 → 양손바닥으로 지우기 · 팔 엑스 ✕ = 모두 지우기', 'warn');
   } else {
-    setMessage(`${match.input.length}번째 숫자 ${n} 입력! 다음 숫자를 보여 주세요`);
+    setMessage(match.cursorLocked
+      ? `${r.at + 1}번째 자리에 ${n} 입력! 다른 칸은 가위로 가리켜서 옮기세요`
+      : `${r.at + 1}번째 자리에 ${n} 입력! 다음 숫자를 보여 주세요`);
   }
   render();
 }
 
 function deleteDigit() {
-  if (game.removeDigit(match)) setMessage('마지막 숫자를 지웠어요');
+  const at = game.removeDigit(match);
+  if (at >= 0) setMessage(`${at + 1}번째 자리 숫자를 지웠어요`);
   render();
 }
 
@@ -239,11 +245,13 @@ function actionFor(count) {
   }
   // 양손바닥(손가락 10개) = 하나 지우기, 0(주먹) ~ 9 = 숫자
   if (count === 10) {
-    return match.input.length ? { label: '하나 지우기', run: deleteDigit } : { label: '양손바닥 = 하나 지우기', run: null };
+    return game.filledCount(match) ? { label: '하나 지우기', run: deleteDigit } : { label: '양손바닥 = 하나 지우기', run: null };
   }
-  if (game.isFull(match)) return { label: '두 손 ◯ = 결과 · ✕ = 모두 지우기', run: null };
+  // 숫자는 화살표(▼)가 있는 자리에 들어감 (이미 숫자가 있으면 바뀜)
+  const at = match.cursor;
+  if (match.input[at] !== null) return { label: `${at + 1}번째 자리는 ${match.input[at]} · 양손바닥으로 지우기`, run: null };
   if (match.input.includes(count)) return { label: `${count}은(는) 이미 있어요`, run: null };
-  return { label: `${match.input.length + 1}번째 숫자 ${count}`, run: () => inputDigit(count) };
+  return { label: `${at + 1}번째 자리에 ${count}`, run: () => inputDigit(count) };
 }
 
 // 지금 두 손 모양으로 무엇을 하게 되는지
@@ -253,9 +261,23 @@ function poseAction(name) {
     return game.isFull(match) ? { label: '동그라미 ◯ 결과!', run: submitGuess } : { label: '숫자를 다 넣고 ◯', run: null };
   }
   if (name === 'x') {
-    return match.input.length ? { label: '엑스 ✕ 모두 지우기', run: clearAll } : { label: '지울 숫자가 없어요', run: null };
+    return game.filledCount(match) ? { label: '엑스 ✕ 모두 지우기', run: clearAll } : { label: '지울 숫자가 없어요', run: null };
   }
+  // 양손 가위(엄지 + 검지 L자) = 검지가 가리키는 쪽으로 화살표(▼) 옮기기
+  if (name === 'left') {
+    return match.cursor > 0 ? { label: '◀ 왼쪽 칸으로', run: () => moveCursor(-1) } : { label: '맨 왼쪽 칸이에요', run: null };
+  }
+  if (name === 'right') {
+    return match.cursor < match.digits - 1 ? { label: '오른쪽 칸으로 ▶', run: () => moveCursor(1) } : { label: '맨 오른쪽 칸이에요', run: null };
+  }
+  if (name === 'scissors') return { label: '검지로 왼쪽 · 오른쪽 가리키기', run: null };
   return null;
+}
+
+// 화살표(▼) 옮기기
+function moveCursor(dir) {
+  if (game.moveCursor(match, dir)) setMessage(`${match.cursor + 1}번째 자리를 골랐어요. 숫자를 보여 주세요`);
+  render();
 }
 
 function done(label, run, now) {
@@ -267,7 +289,11 @@ function done(label, run, now) {
 // 두 손 동그라미 · 엑스 확인 → 모양이 보이는 동안 true (그동안 손가락 수는 숫자로 안 셈)
 function updatePose(result, now) {
   const aspect = canvas.width / canvas.height;
-  let name = poses.isX() ? 'x' : poses.isCircle(result, aspect) ? 'circle' : null;
+  const v = hands.scissors(result, aspect); // 양손 가위: 'left' · 'right' · 'up' · null
+  let name = poses.isX() ? 'x'
+    : poses.isCircle(result, aspect) ? 'circle'
+    : v === 'up' ? 'scissors'
+    : v;
   if (name) poseLastSeen = now;
   // 손을 엇갈리면 손 하나가 잠깐 가려질 수 있어서, 0.3초까지는 같은 모양이 계속되는 걸로 봄
   else if (pose && now - poseLastSeen < POSE_GAP_MS) name = pose;
@@ -342,7 +368,8 @@ function drawHud(now, handCount) {
   }
 
   // 가운데: 두 손 모양이면 ◯ / ✕, 아니면 손가락 수
-  const big = pose === 'circle' ? '◯' : pose === 'x' ? '✕' : shown === null ? '?' : String(shown);
+  const POSE_ICONS = { circle: '◯', x: '✕', left: '◀', right: '▶', scissors: '◀▶' };
+  const big = POSE_ICONS[pose] ?? (shown === null ? '?' : String(shown));
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#ffffff';

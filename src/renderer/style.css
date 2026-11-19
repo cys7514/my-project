@@ -227,6 +227,7 @@ kbd {
 .slots {
   display: flex;
   gap: 8px;
+  padding-top: 18px; /* 위에 ▼ 화살표 자리 */
 }
 
 .slot {
@@ -246,8 +247,24 @@ kbd {
   border-color: var(--accent);
 }
 
-.slot.next {
-  border-color: var(--muted);
+/* ▼ 화살표가 있는 자리 (숫자가 들어갈 곳) */
+.slot {
+  position: relative;
+}
+
+.slot.cursor {
+  border-color: #2ec4f1;
+  box-shadow: 0 0 0 2px rgba(46, 196, 241, 0.35);
+}
+
+.slot.cursor::before {
+  content: '▼';
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #2ec4f1;
+  font-size: 16px;
 }
 
 .message {
