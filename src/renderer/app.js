@@ -4,6 +4,7 @@
 // 3. 결과 화면(카메라 꺼짐): 기록을 바탕으로 피드백 · 조언
 import { FilesetResolver, DrawingUtils } from '/node_modules/@mediapipe/tasks-vision/vision_bundle.mjs';
 import * as hands from './hands.js';
+import * as stadium from './stadium.js';
 
 const $ = (id) => document.getElementById(id);
 const video = $('video');
@@ -25,11 +26,38 @@ const TOO_FAST = 100;          // 100ms보다 빠르면 신호를 보고 반응�
 const CONFIRM_FRAMES = 2;      // 검지가 연속 이만큼의 화면에서 보여야 인정 (한 화면짜리 잘못된 인식 막기)
 const ROUND_CHOICES = [3, 5, 10, 15];
 
-// 모드 2가지 (시간은 둘 다 랜덤)
+// 모드 2가지 = 공연 "회차" (시간은 둘 다 랜덤)
 const MODES = [
-  { id: 'hidden', label: '🎲 남은 시간 숨김', desc: '"준비…"만 보이고 언제 나올지 몰라요 → 진짜 반응 속도' },
-  { id: 'show', label: '⏱ 남은 시간 보기', desc: '남은 시간이 3.2 → 3.1 → … 처럼 줄어드는 게 보여요 → 미리 준비할 수 있어요' },
+  { id: 'hidden', label: '1회차 · 🎲 블라인드 오픈', short: '1회차 블라인드', desc: '언제 열릴지 몰라요 → 진짜 반응 속도' },
+  { id: 'show', label: '2회차 · ⏱ 카운트다운 오픈', short: '2회차 카운트다운', desc: '오픈까지 남은 초가 3.2 → 3.1 → … 로 보여요' },
 ];
+
+// 반응 속도 → 야구장 좌석 (빠를수록 홈플레이트에 가까운 좋은 자리)
+//  id는 야구장 그림(stadium.js)의 구역 이름과 같음
+const SEATS = [
+  { id: 'vip', max: 250, name: '홈플레이트 VIP석', short: 'VIP석', line: '⚡ 번개 같은 반응 속도!' },
+  { id: 'table', max: 350, name: '중앙 테이블석', short: '테이블석', line: '🚀 아주 빨라요!' },
+  { id: 'infield', max: 450, name: '내야 지정석', short: '내야석', line: '👍 빠른 편이에요' },
+  { id: 'outfield', max: 600, name: '외야 지정석', short: '외야석', line: '🙂 보통이에요' },
+  { id: 'lawn', max: Infinity, name: '외야 잔디석', short: '잔디석', line: '🐢 조금 느린 편이에요' },
+];
+function seatOf(ms) {
+  return SEATS.find((s) => ms < s.max);
+}
+
+// 티켓에 적을 자리 번호 (구역마다 블록 번호 범위가 다름, 잔디석은 자유석)
+function seatNumber(seat) {
+  const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const side = Math.random() < 0.5 ? '1루' : '3루';
+  const rowSeat = `${rnd(1, 20)}열 ${rnd(1, 30)}번`;
+  switch (seat.id) {
+    case 'vip': return `${String(rnd(1, 4)).padStart(3, '0')}블록 ${rnd(1, 5)}열 ${rnd(1, 12)}번`;
+    case 'table': return `${String(rnd(11, 24)).padStart(3, '0')}블록 ${rowSeat}`;
+    case 'infield': return `${side} ${rnd(101, 130)}블록 ${rowSeat}`;
+    case 'outfield': return `${side === '1루' ? '우익' : '좌익'} ${rnd(201, 230)}블록 ${rowSeat}`;
+    default: return '중앙 잔디 자유석';
+  }
+}
 
 // ----- 설정 -----
 let mode = 'hidden';
@@ -62,10 +90,17 @@ function makeChoices(box, items, isOn, onPick) {
     b.type = 'button';
     b.className = 'choice';
     b.textContent = item.label;
+    if (item.desc) { // 회차 카드: 아래에 작은 설명
+      const sub = document.createElement('span');
+      sub.className = 'sub';
+      sub.textContent = item.desc;
+      b.appendChild(sub);
+    }
     if (isOn(item)) b.classList.add('on');
     b.addEventListener('click', () => {
       onPick(item);
       [...box.children].forEach((x) => x.classList.toggle('on', x === b));
+      updateSummary();
     });
     box.appendChild(b);
   });
@@ -76,27 +111,37 @@ function showView(name) {
   $('testView').hidden = name !== 'test';
   $('resultView').hidden = name !== 'result';
   $('homeBtn').hidden = name !== 'test';
-  $('setting').textContent = name === 'setup' ? '' : `${modeOf().label} · ${rounds}회`;
+  $('setting').textContent = name === 'setup' ? '' : `${modeOf().short} · ${rounds}매`;
+
+  // 예매 단계 표시: 측정 = 02 좌석 예매, 결과 = 03 예매 완료
+  const step = { setup: 1, test: 2, result: 3 }[name];
+  $('steps').hidden = name === 'setup';
+  $('steps').querySelectorAll('li').forEach((li) => {
+    const n = Number(li.dataset.step);
+    li.classList.toggle('on', n === step);
+    li.classList.toggle('done', n < step);
+  });
 }
 
 function modeOf(id = mode) {
   return MODES.find((m) => m.id === id);
 }
 
+function updateSummary() {
+  $('summary').textContent = `${modeOf().short} · ${rounds}매 · 0원`;
+}
+
 function showSetup() {
   state = 'setup';
   stopCamera();
   showView('setup');
-  $('modeDesc').textContent = modeOf().desc;
+  updateSummary();
 }
 
-makeChoices($('modes'), MODES, (m) => m.id === mode, (m) => {
-  mode = m.id;
-  $('modeDesc').textContent = m.desc;
-});
+makeChoices($('modes'), MODES, (m) => m.id === mode, (m) => { mode = m.id; });
 makeChoices(
   $('rounds'),
-  ROUND_CHOICES.map((n) => ({ n, label: `${n}회` })),
+  ROUND_CHOICES.map((n) => ({ n, label: `${n}매` })),
   (r) => r.n === rounds,
   (r) => { rounds = r.n; },
 );
@@ -107,7 +152,7 @@ async function startSession() {
   state = 'loading';
   showView('test');
   renderRecords();
-  show('idle', '카메라 켜는 중…', '잠시만 기다리세요');
+  show('idle', '예매 페이지 접속 중…', '카메라를 켜고 있어요');
   if (!audio) audio = new AudioContext();
   if (audio.state === 'suspended') audio.resume();
 
@@ -254,19 +299,60 @@ function startRound() {
   $('holdFill').style.width = '0%';
   countStart = performance.now();
   delay = MIN_DELAY + Math.random() * (MAX_DELAY - MIN_DELAY);
-  if (mode === 'hidden') show('count', '준비…', '주먹을 쥐고 기다리세요. "지금!"이 뜨면 검지 ☝');
-  else show('count show-time', secLeft(delay), '초 남았어요 · 0이 되면 검지 ☝');
+
+  // 접속 대기 창 준비: 대기 인원은 랜덤으로 시작해서 줄어듦
+  queue.start = 150 + Math.floor(Math.random() * 750);
+  queue.tau = 1200 + Math.random() * 1300;          // 줄어드는 빠르기 (숨김 모드)
+  queue.floor = 1 + Math.floor(Math.random() * 25); // 숨김 모드에서는 0까지 안 내려감 (오픈 시각을 알려 주지 않게)
+  $('qLabel').textContent = mode === 'hidden' ? '현재 대기 시간' : '오픈까지 남은 시간';
+  $('qNote').innerHTML = mode === 'hidden'
+    ? '주먹 ✊ 을 쥔 채로 기다려 주세요.<br>오픈 전에 검지를 펴면 부정 예매로 처리됩니다.'
+    : '0이 되는 순간 예매가 열립니다.<br>오픈 전에 검지를 펴면 부정 예매로 처리됩니다.';
+  updateQueue(0);
+  show('count', '', '');
+}
+
+// 접속 대기 창 숫자 바꾸기 (elapsed = 기다린 시간 ms)
+const queue = { start: 0, tau: 0, floor: 0 };
+function updateQueue(elapsed) {
+  let people;
+  if (mode === 'hidden') {
+    // 기다린 시간이 올라감 00:00:01 → 00:00:02 …, 대기 인원은 오픈 시각과 상관없이 줄어듦
+    $('qTime').textContent = clock(elapsed);
+    people = Math.max(queue.floor, Math.round(queue.start * Math.exp(-elapsed / queue.tau)));
+  } else {
+    // 남은 시간이 줄어듦 00:03.2 → 00:03.1 …, 대기 인원도 오픈 때 0명
+    const remain = Math.max(delay - elapsed, 0);
+    $('qTime').textContent = `00:${secLeft(remain).padStart(4, '0')}`;
+    people = Math.ceil(queue.start * (remain / delay));
+  }
+  $('qPeople').textContent = people.toLocaleString();
+}
+
+// ms → "00:00:05" (시:분:초)
+function clock(ms) {
+  const s = Math.floor(ms / 1000);
+  const two = (n) => String(n).padStart(2, '0');
+  return `${two(Math.floor(s / 3600))}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}`;
+}
+
+// "중지" 버튼: 이번 매 기다리기를 그만둠 (기록 안 남음, 주먹을 풀었다가 다시 쥐면 다시 대기)
+function stopWaiting() {
+  if (state !== 'count') return;
+  state = 'idle';
+  armed = false;
+  showIdle();
 }
 
 // 화면을 그릴 때마다 남은 시간 · 시간 초과 확인
 function tick(now) {
   if (state === 'count') {
     const remain = delay - (now - countStart);
-    if (mode === 'show' && remain > 0) msgBig.textContent = secLeft(remain);
+    if (remain > 0) updateQueue(now - countStart);
     if (remain <= 0) {
       state = 'go';
       signalTime = performance.now(); // 이 화면이 그려지는 시각이 신호 시각
-      show('go', '지금!', '검지를 펴세요! ☝');
+      show('go', '예매 오픈!', '지금 검지를 펴세요! ☝');
       beep(1040, 0.2);
     }
   } else if (state === 'go' && performance.now() - signalTime > TIMEOUT) {
@@ -293,10 +379,10 @@ function finish(kind, ms = null) {
   renderRecords();
 
   const done = records.length >= rounds;
-  const next = done ? '측정 끝! 잠시 뒤 결과가 나와요' : '다음 회: 주먹 ✊ 을 쥐세요';
-  if (kind === 'ok') show('result', fmt(ms), `${comment(ms)} · ${next}`);
-  else if (kind === 'foul') show('foul', '부정 출발!', `신호가 나오기 전에 검지를 폈어요 · ${next}`);
-  else show('foul', '시간 초과', `${TIMEOUT / 1000}초 안에 검지를 펴지 않았어요 · ${next}`);
+  const next = done ? '예매 끝! 잠시 뒤 티켓이 나와요' : '다음 매: 주먹 ✊ 을 쥐세요';
+  if (kind === 'ok') show('result', `🎟 ${seatOf(ms).short} 확보!`, `${fmt(ms)} · ${seatOf(ms).name} · ${next}`);
+  else if (kind === 'foul') show('foul', '🚫 부정 예매', `오픈 전에 검지를 폈어요 (매크로 의심 🤖) · ${next}`);
+  else show('foul', '매진되었습니다', `${TIMEOUT / 1000}초 안에 검지를 펴지 않았어요 · ${next}`);
 
   if (done) {
     setTimeout(() => {
@@ -305,24 +391,20 @@ function finish(kind, ms = null) {
   }
 }
 
-function comment(ms) {
-  if (ms < 250) return '번개처럼 빨라요! ⚡';
-  if (ms < 350) return '아주 빨라요!';
-  if (ms < 450) return '좋아요!';
-  if (ms < 600) return '보통이에요';
-  return '조금 더 집중해 봐요';
-}
-
 // ===== 4. 측정 화면 표시 =====
 function show(cls, big, small) {
   screen.className = `screen ${cls}`;
   msgBig.textContent = big;
   msgSmall.textContent = small;
+  // 기다리는 동안에는 글자 대신 "접속 대기 중" 창을 띄움
+  const waiting = cls === 'count';
+  $('queue').hidden = !waiting;
+  $('message').hidden = waiting;
 }
 
 function showIdle() {
-  const how = mode === 'hidden' ? '언제 나올지 몰라요' : '남은 시간이 보여요';
-  show('idle', '주먹 ✊ 을 쥐면 시작', `랜덤 시간 뒤 "지금!"이 뜨면 검지 ☝ 를 펴세요 (${how})`);
+  const how = mode === 'hidden' ? '언제 열릴지 몰라요' : '남은 시간이 보여요';
+  show('idle', '주먹 ✊ 을 쥐면 대기열 입장', `랜덤 시간 뒤 "예매 오픈!"이 뜨면 검지 ☝ 를 펴세요 (${how})`);
 }
 
 // 남은 시간 (ms) → "3.2" 처럼 소수 첫째 자리까지 (0.0이 되기 전에는 0.1로 보이게 올림)
@@ -356,19 +438,24 @@ function renderRecords() {
     const li = document.createElement('li');
     if (!r) {
       li.classList.add('todo');
-      li.innerHTML = `<span class="no">${i + 1}회</span>-`;
+      li.innerHTML = `<span class="no">${i + 1}매</span>-`;
     } else {
       const isBest = r.kind === 'ok' && r.ms === best;
       if (r.kind !== 'ok') li.classList.add('bad');
       if (isBest) li.classList.add('best');
-      li.innerHTML = `<span class="no">${i + 1}회</span><span class="time">${label(r)}${isBest ? ' 🏆' : ''}</span>`;
+      li.innerHTML = `<span class="no">${i + 1}매</span>${seatTag(r)}<span class="time">${label(r)}${isBest ? ' 🏆' : ''}</span>`;
     }
     list.appendChild(li);
   }
 }
 
 function label(r) {
-  return r.kind === 'ok' ? fmt(r.ms) : r.kind === 'foul' ? '부정 출발' : '시간 초과';
+  return r.kind === 'ok' ? fmt(r.ms) : r.kind === 'foul' ? '부정 예매' : '매진';
+}
+
+// 성공한 매는 앞에 좌석 등급 (예: R석 312 ms)
+function seatTag(r) {
+  return r.kind === 'ok' ? `<span class="seat">${seatOf(r.ms).short}</span>` : '';
 }
 
 function fmt(ms) {
@@ -390,7 +477,23 @@ function showFeedback() {
   // 표준편차: 기록이 평균에서 보통 얼마나 벗어나는지 (작을수록 고름)
   const spread = ok.length >= 2 ? Math.sqrt(average(ok.map((x) => (x - avg) ** 2))) : null;
 
-  $('resultSetting').textContent = `${modeOf().label} · ${rounds}회`;
+  $('resultSetting').textContent = `${modeOf().label} · ${rounds}매`;
+  // 티켓 정보: 예매번호(오늘 날짜 + 랜덤 4자리), 관람일, 회차, 평균으로 정한 좌석 등급
+  const d = new Date();
+  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  $('tNo').textContent = `T${ymd}-${Math.floor(1000 + Math.random() * 9000)}`;
+  $('tDate').textContent = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+  $('tMode').textContent = modeOf().short;
+  const mySeat = avg !== null ? seatOf(avg) : null;
+  $('tSeat').textContent = mySeat ? mySeat.short : '매진';
+  $('tSeatName').textContent = mySeat ? mySeat.name : '';
+  $('tSeatNo').textContent = mySeat ? seatNumber(mySeat) : '';
+
+  // 야구장 배치도: 평균으로 정한 내 자리는 빨갛게, 매마다 잡았던 구역에는 횟수 표시
+  const counts = {};
+  ok.forEach((ms) => { const id = seatOf(ms).id; counts[id] = (counts[id] || 0) + 1; });
+  stadium.draw($('mapResult'), mySeat && mySeat.id, counts);
+  stadium.legend($('legendResult'), SEATS, mySeat && mySeat.id, counts);
   $('rAvg').textContent = avg !== null ? fmt(avg) : '-';
   $('rBest').textContent = best !== null ? fmt(best) : '-';
   $('rWorst').textContent = worst !== null ? fmt(worst) : '-';
@@ -407,9 +510,10 @@ function showFeedback() {
     row.className = 'chart-row';
     if (r.kind !== 'ok') row.classList.add('bad');
     if (r.kind === 'ok' && r.ms === best) row.classList.add('best');
-    row.innerHTML = `<span class="no">${i + 1}회</span>
+    const seat = r.kind === 'ok' ? `${seatOf(r.ms).short} · ` : '';
+    row.innerHTML = `<span class="no">${i + 1}매</span>
       <div class="track"><div class="fill"></div></div>
-      <span class="val">${label(r)}${r.kind === 'ok' && r.ms === best ? ' 🏆' : ''}</span>`;
+      <span class="val">${seat}${label(r)}${r.kind === 'ok' && r.ms === best ? ' 🏆' : ''}</span>`;
     // (보안 설정 때문에 style="..."를 글자로 못 넣어서 자바스크립트로 길이를 정함)
     row.querySelector('.fill').style.width = `${r.kind === 'ok' ? (r.ms / max) * 100 : 0}%`;
     chart.appendChild(row);
@@ -423,19 +527,15 @@ function showFeedback() {
 }
 
 function grade(avg) {
-  if (avg === null) return '😥 성공한 기록이 없어요';
-  if (avg < 250) return '⚡ 번개 같은 반응 속도!';
-  if (avg < 350) return '🚀 아주 빨라요!';
-  if (avg < 450) return '👍 빠른 편이에요';
-  if (avg < 600) return '🙂 보통이에요';
-  return '🐢 조금 느린 편이에요';
+  if (avg === null) return '😥 한 장도 예매하지 못했어요';
+  return seatOf(avg).line;
 }
 
 function makeAdvice({ ok, fouls, lates, avg, best, spread }) {
   const list = [];
 
   if (!ok.length) {
-    list.push('한 번도 성공하지 못했어요. 먼저 <b>손이 화면 가운데에 크게</b> 보이는지, 아래 손 상태에 <b>✊ 주먹</b> · <b>☝ 검지 펼침</b>이 제대로 뜨는지 확인해 보세요.');
+    list.push('한 장도 예매하지 못했어요. 먼저 <b>손이 화면 가운데에 크게</b> 보이는지, 아래 손 상태에 <b>✊ 주먹</b> · <b>☝ 검지 펼침</b>이 제대로 뜨는지 확인해 보세요.');
   } else {
     // 지난번과 비교
     const prev = lastAverage[mode];
@@ -447,7 +547,7 @@ function makeAdvice({ ok, fouls, lates, avg, best, spread }) {
     }
 
     const bestRound = records.findIndex((r) => r.kind === 'ok' && r.ms === best) + 1;
-    list.push(`가장 빨랐던 건 <b>${bestRound}회째 ${fmt(best)}</b>예요. 그때처럼 집중하면 평균도 더 빨라질 수 있어요.`);
+    list.push(`가장 빨랐던 건 <b>${bestRound}매째 ${fmt(best)} (${seatOf(best).name})</b>예요. 그때처럼 집중하면 평균도 더 빨라질 수 있어요.`);
 
     // 고른 정도
     if (spread !== null) {
@@ -468,17 +568,17 @@ function makeAdvice({ ok, fouls, lates, avg, best, spread }) {
 
   if (fouls) {
     list.push(mode === 'hidden'
-      ? `부정 출발이 <b>${fouls}번</b> 있었어요. 언제 나올지 <b>짐작하지 말고</b>, 초록색 화면을 <b>본 다음</b> 움직이세요.`
-      : `부정 출발이 <b>${fouls}번</b> 있었어요. 숫자가 <b>0이 된 다음</b> 펴야 해요. 너무 서두르지 마세요.`);
+      ? `부정 예매가 <b>${fouls}번</b> 있었어요. 언제 열릴지 <b>짐작하지 말고</b>, "예매 오픈!" 화면을 <b>본 다음</b> 움직이세요.`
+      : `부정 예매가 <b>${fouls}번</b> 있었어요. 숫자가 <b>0이 된 다음</b> 펴야 해요. 너무 서두르지 마세요.`);
   }
   if (lates) {
-    list.push(`시간 초과가 <b>${lates}번</b> 있었어요. 검지를 <b>곧게 쭉</b> 펴야 인식돼요. 손이 너무 멀거나 어두우면 인식이 늦어요.`);
+    list.push(`매진이 <b>${lates}번</b> 있었어요. 검지를 <b>곧게 쭉</b> 펴야 인식돼요. 손이 너무 멀거나 어두우면 인식이 늦어요.`);
   }
 
   if (mode === 'show' && ok.length) {
-    list.push('남은 시간 보기는 미리 준비할 수 있어서 기록이 빨리 나와요. <b>🎲 남은 시간 숨김</b> 모드로 진짜 반응 속도도 재 보세요.');
+    list.push('카운트다운 오픈은 미리 준비할 수 있어서 기록이 빨리 나와요. <b>1회차 🎲 블라인드 오픈</b>으로 진짜 반응 속도도 재 보세요.');
   } else if (mode === 'hidden' && avg !== null && avg < 350 && !fouls) {
-    list.push('부정 출발 없이 이 정도면 정말 훌륭해요! <b>10회 · 15회</b>로 늘려서 꾸준함도 도전해 보세요.');
+    list.push('부정 예매 없이 이 정도면 정말 훌륭해요! <b>10매 · 15매</b>로 늘려서 꾸준함도 도전해 보세요.');
   }
 
   list.push('참고: 웹캠과 손 인식에도 시간이 조금 걸려서, 버튼을 누르는 테스트보다 기록이 <b>약 0.1초</b> 느리게 나올 수 있어요.');
@@ -490,6 +590,11 @@ $('startBtn').addEventListener('click', startSession);
 $('againBtn').addEventListener('click', startSession);
 $('setupBtn').addEventListener('click', showSetup);
 $('homeBtn').addEventListener('click', showSetup); // 측정 도중 그만두기 (이번 기록은 버림)
+$('qStop').addEventListener('click', stopWaiting);
+
+// 야구장 좌석 배치도 (설정 화면: 안내용 / 결과 화면: 내 자리 표시)
+stadium.draw($('mapSetup'));
+stadium.legend($('legendSetup'), SEATS);
 
 showSetup();
 requestAnimationFrame(tick);

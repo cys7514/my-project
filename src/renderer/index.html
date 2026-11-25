@@ -8,44 +8,94 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- ===== 위쪽 막대 (예매 사이트 머리글처럼) ===== -->
   <header class="bar">
-    <h1>⚡ 반응 속도 측정기</h1>
+    <div class="logo">⚡ 번개<b>티켓</b></div>
+    <nav class="nav">
+      <span>콘서트</span><span class="on">스포츠</span><span>반응속도</span>
+    </nav>
     <span id="setting" class="setting"></span>
-    <button id="homeBtn" class="btn small" type="button" hidden>처음으로</button>
+    <button id="homeBtn" class="btn ghost small" type="button" hidden>예매 취소</button>
     <span id="camState" class="cam-state"></span>
   </header>
 
-  <!-- ===== 1. 설정 화면 (카메라 꺼짐) ===== -->
+  <!-- 예매 단계 (측정 · 결과 화면에서만 보임) -->
+  <ol id="steps" class="steps" hidden>
+    <li data-step="1">01 회차 · 매수 선택</li>
+    <li data-step="2">02 좌석 예매</li>
+    <li data-step="3">03 예매 완료</li>
+  </ol>
+
+  <!-- ===== 1. 설정 화면 = 공연 상세 페이지 (카메라 꺼짐) ===== -->
   <div id="setupView" class="view setup">
-    <div class="setup-card">
-      <h2>측정 설정</h2>
+    <div class="detail">
+      <!-- 포스터 (그림 파일 없이 CSS로 그림) -->
+      <div class="poster-col">
+        <div class="poster">
+          <div class="poster-top">2026 OPENING GAME</div>
+          <div class="poster-bolt">⚾</div>
+          <div class="poster-title">REACTION<br>LEAGUE</div>
+          <div class="poster-sub">지금! 검지를 펴라</div>
+          <div class="poster-bottom">번개 스타디움 · 내 웹캠 구장</div>
+        </div>
+        <div class="badges"><span>단독판매</span><span>전체관람가</span><span>무료</span></div>
+      </div>
 
-      <section>
-        <h3>모드 (기다리는 시간은 둘 다 랜덤 2 ~ 6초)</h3>
-        <div id="modes" class="choices"></div>
-        <p id="modeDesc" class="desc"></p>
+      <!-- 경기 정보 + 예매 상자 -->
+      <div class="info-col">
+        <div class="genre">스포츠 · 야구 · 반응속도</div>
+        <h2 class="show-title">반응속도 리그 2026 개막전 〈지금! 검지를 펴라〉</h2>
+        <dl class="info">
+          <dt>장소</dt><dd>번개 스타디움 (내 방 · 웹캠 구장)</dd>
+          <dt>관람시간</dt><dd>약 1 ~ 3분 (매수에 따라 다름)</dd>
+          <dt>예매 오픈</dt><dd>주먹 ✊ 을 쥔 뒤 <b>랜덤 2 ~ 6초</b></dd>
+          <dt>가격</dt><dd><b class="price">0원</b></dd>
+        </dl>
+
+        <div class="booking">
+          <section>
+            <h3><span class="step-no">STEP 1</span> 관람 회차 선택</h3>
+            <div id="modes" class="choices cards"></div>
+          </section>
+
+          <section>
+            <h3><span class="step-no">STEP 2</span> 매수 선택 <small>(1매 = 1회 측정)</small></h3>
+            <div id="rounds" class="choices"></div>
+          </section>
+
+          <div class="summary">
+            <span>선택 내역</span>
+            <b id="summary"></b>
+          </div>
+          <button id="startBtn" class="btn primary big" type="button">예매하기 <small>(카메라 켜기)</small></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="below">
+      <section class="seatmap">
+        <h3>좌석 배치도 <small>반응이 빠를수록 홈플레이트에 가까운 자리!</small></h3>
+        <div class="map-wrap">
+          <div id="mapSetup" class="map"></div>
+          <ul id="legendSetup" class="legend"></ul>
+        </div>
       </section>
 
-      <section>
-        <h3>몇 회 할까요?</h3>
-        <div id="rounds" class="choices"></div>
-      </section>
-
-      <button id="startBtn" class="btn primary" type="button">측정 시작 (카메라 켜기)</button>
-
-      <section class="help">
-        <h3>하는 방법</h3>
+      <section class="notice">
+        <h3>예매 유의사항</h3>
         <ul>
-          <li>카메라에 손을 보이고 <b>주먹 ✊</b>을 쥐면 (0.5초) 한 회가 시작돼요.</li>
-          <li>주먹을 쥐고 기다리다가 초록색 <b>"지금!"</b>이 뜨면 <b>검지 ☝</b>를 재빨리 펴세요.</li>
-          <li>신호 전에 검지를 펴면 <b>부정 출발</b>, 3초 안에 안 펴면 <b>시간 초과</b> (둘 다 1회로 셈).</li>
-          <li>정한 횟수를 다 하면 카메라가 꺼지고 <b>결과와 조언</b>이 나와요.</li>
+          <li>카메라에 손을 보이고 <b>주먹 ✊</b>을 쥐면 (0.5초) 대기열에 들어가요.</li>
+          <li>"접속 대기 중" 창이 뜨면 주먹을 쥔 채로 기다리세요.</li>
+          <li><b>"예매 오픈!"</b>이 뜨면 <b>검지 ☝</b>를 재빨리 펴세요.</li>
+          <li>오픈 전에 검지를 펴면 <b>부정 예매</b>, 3초 안에 안 펴면 <b>매진</b> (둘 다 1매로 셈).</li>
+          <li>대기 창의 <b>중지</b>를 누르면 그 매는 기록 없이 취소돼요.</li>
+          <li>매수를 다 쓰면 카메라가 꺼지고 <b>예매 완료 티켓</b>과 조언이 나와요.</li>
         </ul>
       </section>
     </div>
   </div>
 
-  <!-- ===== 2. 측정 화면 (위: 기록 / 아래: 카메라) ===== -->
+  <!-- ===== 2. 측정 화면 = 좌석 예매 (위: 기록 / 아래: 카메라) ===== -->
   <div id="testView" class="view test" hidden>
     <div class="top">
       <div class="stats">
@@ -59,7 +109,7 @@
         </div>
         <div class="stat">
           <div class="stat-label">평균</div>
-          <div id="avgTime" class="stat-value avg">-</div>
+          <div id="avgTime" class="stat-value accent">-</div>
         </div>
         <div class="stat">
           <div class="stat-label">최고 기록</div>
@@ -70,45 +120,90 @@
     </div>
 
     <div id="screen" class="screen idle">
+      <div class="stage-label">STAGE</div>
       <video id="video" autoplay playsinline muted></video>
       <canvas id="overlay"></canvas>
-      <div class="message">
+      <div id="message" class="message">
         <div id="msgBig" class="msg-big"></div>
         <div id="msgSmall" class="msg-small"></div>
+      </div>
+
+      <!-- 접속 대기 창 (기다리는 동안) -->
+      <div id="queue" class="queue-dim" hidden>
+        <div class="queue">
+          <div class="q-circle">
+            <div id="qLabel" class="q-label">현재 대기 시간</div>
+            <div id="qTime" class="q-time">00:00:00</div>
+          </div>
+          <div class="q-title">접속 대기 중입니다.</div>
+          <div class="q-people">현재 대기 인원 <b><span id="qPeople">0</span>명</b></div>
+          <p id="qNote" class="q-note"></p>
+          <button id="qStop" class="q-stop" type="button">중지</button>
+        </div>
       </div>
     </div>
 
     <div class="hand-row">
       <span id="handState" class="hand-state">손이 안 보여요</span>
       <div class="meter"><div id="holdFill" class="meter-fill"></div></div>
+      <span class="meter-hint">주먹 유지 → 대기열 입장</span>
     </div>
   </div>
 
-  <!-- ===== 3. 결과 · 조언 화면 (카메라 꺼짐) ===== -->
+  <!-- ===== 3. 결과 화면 = 예매 완료 (카메라 꺼짐) ===== -->
   <div id="resultView" class="view result-view" hidden>
-    <div class="result-card">
-      <h2>측정 결과</h2>
-      <p id="resultSetting" class="desc"></p>
-
-      <div id="grade" class="grade"></div>
-
-      <div class="stats five">
-        <div class="stat"><div class="stat-label">평균</div><div id="rAvg" class="stat-value avg">-</div></div>
-        <div class="stat"><div class="stat-label">최고</div><div id="rBest" class="stat-value">-</div></div>
-        <div class="stat"><div class="stat-label">최저</div><div id="rWorst" class="stat-value">-</div></div>
-        <div class="stat"><div class="stat-label">들쭉날쭉 (±)</div><div id="rSpread" class="stat-value">-</div></div>
-        <div class="stat"><div class="stat-label">성공</div><div id="rOk" class="stat-value">-</div></div>
+    <div class="result-wrap">
+      <div class="done-head">
+        <div class="done-check">✓</div>
+        <h2>예매가 완료되었습니다</h2>
+        <p id="resultSetting" class="desc"></p>
       </div>
 
-      <h3>회차별 기록</h3>
-      <div id="chart" class="chart"></div>
+      <!-- 티켓 -->
+      <div class="ticket">
+        <div class="ticket-main">
+          <div class="t-brand">⚡ 번개티켓 · MOBILE TICKET</div>
+          <div class="t-title">반응속도 리그 2026 개막전 · 번개 스타디움</div>
+          <div class="t-row">
+            <div><span>예매번호</span><b id="tNo">-</b></div>
+            <div><span>관람일</span><b id="tDate">-</b></div>
+            <div><span>회차</span><b id="tMode">-</b></div>
+          </div>
+          <div class="stats five">
+            <div class="stat"><div class="stat-label">평균</div><div id="rAvg" class="stat-value accent">-</div></div>
+            <div class="stat"><div class="stat-label">최고</div><div id="rBest" class="stat-value">-</div></div>
+            <div class="stat"><div class="stat-label">최저</div><div id="rWorst" class="stat-value">-</div></div>
+            <div class="stat"><div class="stat-label">들쭉날쭉 (±)</div><div id="rSpread" class="stat-value">-</div></div>
+            <div class="stat"><div class="stat-label">예매 성공</div><div id="rOk" class="stat-value">-</div></div>
+          </div>
+        </div>
+        <div class="ticket-stub">
+          <div class="stub-label">SEAT</div>
+          <div id="tSeat" class="stub-seat">-</div>
+          <div id="tSeatName" class="stub-name"></div>
+          <div id="tSeatNo" class="stub-no"></div>
+          <div id="grade" class="stub-grade"></div>
+          <div class="barcode"></div>
+        </div>
+      </div>
 
-      <h3>피드백 · 조언</h3>
-      <ul id="advice" class="advice"></ul>
+      <div class="result-card">
+        <h3>내 좌석 위치 <small>(평균 기록으로 정한 자리 · ×숫자 = 그 구역을 잡은 매수)</small></h3>
+        <div class="map-wrap">
+          <div id="mapResult" class="map"></div>
+          <ul id="legendResult" class="legend"></ul>
+        </div>
+
+        <h3>매수별 예매 기록</h3>
+        <div id="chart" class="chart"></div>
+
+        <h3>예매 코치의 피드백 · 조언</h3>
+        <ul id="advice" class="advice"></ul>
+      </div>
 
       <div class="result-buttons">
-        <button id="againBtn" class="btn primary" type="button">같은 설정으로 다시</button>
-        <button id="setupBtn" class="btn" type="button">설정 바꾸기</button>
+        <button id="againBtn" class="btn primary" type="button">같은 공연 다시 예매</button>
+        <button id="setupBtn" class="btn ghost" type="button">다른 회차 선택</button>
       </div>
     </div>
   </div>
