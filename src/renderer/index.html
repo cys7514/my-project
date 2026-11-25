@@ -85,9 +85,9 @@
         <h3>예매 유의사항</h3>
         <ul>
           <li>카메라에 손을 보이고 <b>주먹 ✊</b>을 쥐면 (0.5초) 대기열에 들어가요.</li>
-          <li>"접속 대기 중" 창이 뜨면 주먹을 쥔 채로 기다리세요.</li>
+          <li>"접속 대기 중" 창이 뜨면 주먹을 쥔 채로 기다리세요. <b>손을 펴면 대기 시간이 멈추고</b>, 다시 쥐면 이어서 흘러요.</li>
           <li><b>"예매 오픈!"</b>이 뜨면 <b>검지 ☝</b>를 재빨리 펴세요.</li>
-          <li>오픈 전에 검지를 펴면 <b>부정 예매</b>, 3초 안에 안 펴면 <b>매진</b> (둘 다 1매로 셈).</li>
+          <li>0.1초보다 빠르면 찍은 걸로 보고 <b>부정 예매</b>(1회차), 3초 안에 안 펴면 <b>매진</b> (둘 다 1매로 셈).</li>
           <li>대기 창의 <b>중지</b>를 누르면 그 매는 기록 없이 취소돼요.</li>
           <li>매수를 다 쓰면 카메라가 꺼지고 <b>예매 완료 티켓</b>과 조언이 나와요.</li>
         </ul>
@@ -119,6 +119,8 @@
       <ol id="history" class="history"></ol>
     </div>
 
+    <!-- 무대 자리: 카메라 비율에 맞춘 화면을 가운데에 놓음 -->
+    <div class="stage-area">
     <div id="screen" class="screen idle">
       <div class="stage-label">STAGE</div>
       <video id="video" autoplay playsinline muted></video>
@@ -135,12 +137,13 @@
             <div id="qLabel" class="q-label">현재 대기 시간</div>
             <div id="qTime" class="q-time">00:00:00</div>
           </div>
-          <div class="q-title">접속 대기 중입니다.</div>
+          <div id="qTitle" class="q-title">접속 대기 중입니다.</div>
           <div class="q-people">현재 대기 인원 <b><span id="qPeople">0</span>명</b></div>
           <p id="qNote" class="q-note"></p>
           <button id="qStop" class="q-stop" type="button">중지</button>
         </div>
       </div>
+    </div>
     </div>
 
     <div class="hand-row">

@@ -66,7 +66,9 @@ let rounds = 5;
 // ----- 상태 -----
 // setup(설정) → idle(주먹 기다림) → count(랜덤 시간) → go(지금!) → result / foul → … → feedback(결과 화면)
 let state = 'setup';
-let countStart = 0;
+let waited = 0;               // 이번 매에서 주먹을 쥐고 기다린 시간 (손을 펴면 안 늘어남)
+let lastTick = 0;
+let fistHeld = false;         // 기다리는 동안 지금 주먹을 쥐고 있는지
 let delay = 0;
 let signalTime = 0;
 let finishedAt = 0;
@@ -202,6 +204,9 @@ async function startCamera() {
     await video.play();
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
+    // 무대를 카메라와 같은 가로:세로 비율로 (예: 1280 / 720 = 16:9, 640 / 480 = 4:3)
+    screen.style.setProperty('--cam-ratio', `${video.videoWidth} / ${video.videoHeight}`);
+    console.log('카메라 해상도', video.videoWidth, 'x', video.videoHeight);
     const fps = stream.getVideoTracks()[0].getSettings().frameRate;
     $('camState').textContent = `카메라 켜짐${fps ? ` · ${Math.round(fps)}fps` : ''}`;
     camOn = true;
@@ -280,7 +285,8 @@ function handleShape(shape, frameTime, now) {
       $('holdFill').style.width = '0%';
     }
   } else if (state === 'count') {
-    if (indexConfirmed) finish('foul');
+    // 기다리는 동안: 주먹을 쥐고 있을 때만 시간이 흐름. 손을 펴거나 손이 안 보이면 멈춤
+    setFistHeld(shape === 'fist');
   } else if (state === 'go') {
     if (indexConfirmed) {
       // 검지를 처음 편 화면이 신호보다 먼저 찍혔거나 너무 빠르면 부정 출발
@@ -297,7 +303,8 @@ function startRound() {
   armed = false;
   fistSince = 0;
   $('holdFill').style.width = '0%';
-  countStart = performance.now();
+  waited = 0;
+  lastTick = performance.now();
   delay = MIN_DELAY + Math.random() * (MAX_DELAY - MIN_DELAY);
 
   // 접속 대기 창 준비: 대기 인원은 랜덤으로 시작해서 줄어듦
@@ -305,11 +312,25 @@ function startRound() {
   queue.tau = 1200 + Math.random() * 1300;          // 줄어드는 빠르기 (숨김 모드)
   queue.floor = 1 + Math.floor(Math.random() * 25); // 숨김 모드에서는 0까지 안 내려감 (오픈 시각을 알려 주지 않게)
   $('qLabel').textContent = mode === 'hidden' ? '현재 대기 시간' : '오픈까지 남은 시간';
-  $('qNote').innerHTML = mode === 'hidden'
-    ? '주먹 ✊ 을 쥔 채로 기다려 주세요.<br>오픈 전에 검지를 펴면 부정 예매로 처리됩니다.'
-    : '0이 되는 순간 예매가 열립니다.<br>오픈 전에 검지를 펴면 부정 예매로 처리됩니다.';
+  fistHeld = false;
+  setFistHeld(true); // 주먹을 쥐어서 시작했으니 처음에는 시간이 흐르는 상태
   updateQueue(0);
   show('count', '', '');
+}
+
+// 주먹을 쥐고 있는지에 따라 대기 시간을 흐르게 / 멈추게 하고, 창 글자도 바꿈
+function setFistHeld(held) {
+  if (held === fistHeld) return;
+  fistHeld = held;
+  $('queue').classList.toggle('paused', !held);
+  $('qTitle').textContent = held ? '접속 대기 중입니다.' : '대기가 멈췄어요';
+  if (held) {
+    $('qNote').innerHTML = mode === 'hidden'
+      ? '주먹 ✊ 을 쥐고 있는 동안만 대기 시간이 흘러요.<br>"예매 오픈!"이 뜨면 검지 ☝ 를 펴세요.'
+      : '주먹 ✊ 을 쥐고 있는 동안만 시간이 줄어요.<br>0이 되는 순간 예매가 열립니다.';
+  } else {
+    $('qNote').innerHTML = '손을 펴면 시간이 멈춰요.<br><b>주먹 ✊ 을 다시 쥐면</b> 이어서 기다려요.';
+  }
 }
 
 // 접속 대기 창 숫자 바꾸기 (elapsed = 기다린 시간 ms)
@@ -347,8 +368,12 @@ function stopWaiting() {
 // 화면을 그릴 때마다 남은 시간 · 시간 초과 확인
 function tick(now) {
   if (state === 'count') {
-    const remain = delay - (now - countStart);
-    if (remain > 0) updateQueue(now - countStart);
+    // 주먹을 쥐고 있을 때만 기다린 시간(waited)이 늘어남
+    const t = performance.now();
+    if (fistHeld) waited += Math.max(t - lastTick, 0);
+    lastTick = t;
+    const remain = delay - waited;
+    if (remain > 0) updateQueue(waited);
     if (remain <= 0) {
       state = 'go';
       signalTime = performance.now(); // 이 화면이 그려지는 시각이 신호 시각
@@ -381,7 +406,10 @@ function finish(kind, ms = null) {
   const done = records.length >= rounds;
   const next = done ? '예매 끝! 잠시 뒤 티켓이 나와요' : '다음 매: 주먹 ✊ 을 쥐세요';
   if (kind === 'ok') show('result', `🎟 ${seatOf(ms).short} 확보!`, `${fmt(ms)} · ${seatOf(ms).name} · ${next}`);
-  else if (kind === 'foul') show('foul', '🚫 부정 예매', `오픈 전에 검지를 폈어요 (매크로 의심 🤖) · ${next}`);
+  else if (kind === 'foul') {
+    const why = ms < 0 ? '오픈 전에 검지를 폈어요' : `${TOO_FAST / 1000}초보다 빨라요. 보고 반응한 게 아니라 찍었어요`;
+    show('foul', '🚫 부정 예매', `${why} (매크로 의심 🤖) · ${next}`);
+  }
   else show('foul', '매진되었습니다', `${TIMEOUT / 1000}초 안에 검지를 펴지 않았어요 · ${next}`);
 
   if (done) {
@@ -568,7 +596,7 @@ function makeAdvice({ ok, fouls, lates, avg, best, spread }) {
 
   if (fouls) {
     list.push(mode === 'hidden'
-      ? `부정 예매가 <b>${fouls}번</b> 있었어요. 언제 열릴지 <b>짐작하지 말고</b>, "예매 오픈!" 화면을 <b>본 다음</b> 움직이세요.`
+      ? `부정 예매(0.1초보다 빠름)가 <b>${fouls}번</b> 있었어요. 언제 열릴지 <b>짐작하지 말고</b>, "예매 오픈!" 화면을 <b>본 다음</b> 움직이세요.`
       : `부정 예매가 <b>${fouls}번</b> 있었어요. 숫자가 <b>0이 된 다음</b> 펴야 해요. 너무 서두르지 마세요.`);
   }
   if (lates) {
