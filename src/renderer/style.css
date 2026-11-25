@@ -356,7 +356,8 @@ body {
   color: var(--sub);
 }
 .hand-state.fist { background: var(--navy); border-color: var(--navy); color: #fff; }
-.hand-state.index { background: var(--accent); border-color: var(--accent); color: #fff; }
+.hand-state.point { background: var(--accent); border-color: var(--accent); color: #fff; }
+.hand-state.open { background: #fff4f6; border-color: var(--accent); color: var(--accent); }
 .hand-state.other { color: var(--text); }
 .meter {
   position: relative;

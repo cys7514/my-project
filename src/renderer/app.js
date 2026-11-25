@@ -76,6 +76,7 @@ let fistSince = 0;
 let armed = true;             // 주먹을 한 번 풀어야 다음 시작을 받음
 let indexStreak = 0;
 let indexFirstTime = 0;
+let pointStreak = 0;          // 검지만 편 모양(☝)이 연속으로 보인 화면 수
 let records = [];             // 이번 측정의 기록 { ms, kind: 'ok' | 'foul' | 'late' }
 const lastAverage = {};       // 모드별 지난번 평균 (다음 결과에서 비교)
 let audio = null;
@@ -256,21 +257,26 @@ function onFrame(gen, meta) {
 const SHAPE_LABEL = {
   none: '손이 안 보여요',
   fist: '✊ 주먹',
-  index: '☝ 검지 펼침',
-  other: '✋ 손 보임',
+  point: '☝ 검지 펼침',
+  open: '✋ 손 펼침',
+  other: '🖐 손 보임',
 };
 
 function handleShape(shape, frameTime, now) {
   $('handState').textContent = SHAPE_LABEL[shape];
   $('handState').className = `hand-state ${shape}`;
 
-  if (shape === 'index') {
+  // 검지가 펴진 모양(☝ 또는 ✋)이 연속으로 몇 화면째 보이는지 → "예매 오픈!" 뒤 반응 인식에 씀
+  if (hands.isIndexUp(shape)) {
     indexStreak++;
     if (indexStreak === 1) indexFirstTime = frameTime;
   } else {
     indexStreak = 0;
   }
   const indexConfirmed = indexStreak >= CONFIRM_FRAMES;
+
+  // 검지만 편 모양(☝)이 연속으로 몇 화면째 보이는지 → 기다리는 동안 부정 예매 판단에 씀
+  pointStreak = shape === 'point' ? pointStreak + 1 : 0;
 
   if (state === 'idle' || state === 'result' || state === 'foul') {
     if (shape !== 'fist') armed = true;
@@ -285,7 +291,12 @@ function handleShape(shape, frameTime, now) {
       $('holdFill').style.width = '0%';
     }
   } else if (state === 'count') {
-    // 기다리는 동안: 주먹을 쥐고 있을 때만 시간이 흐름. 손을 펴거나 손이 안 보이면 멈춤
+    // 기다리는 동안: 검지만 펴면(☝) 원래 인식처럼 부정 예매
+    if (pointStreak >= CONFIRM_FRAMES) {
+      finish('foul', -1); // -1 = 오픈 전에 폈다는 표시
+      return;
+    }
+    // 주먹을 쥐고 있을 때만 시간이 흐름. 손을 펼치거나(✋) 손이 안 보이면 멈춤
     setFistHeld(shape === 'fist');
   } else if (state === 'go') {
     if (indexConfirmed) {
@@ -326,10 +337,10 @@ function setFistHeld(held) {
   $('qTitle').textContent = held ? '접속 대기 중입니다.' : '대기가 멈췄어요';
   if (held) {
     $('qNote').innerHTML = mode === 'hidden'
-      ? '주먹 ✊ 을 쥐고 있는 동안만 대기 시간이 흘러요.<br>"예매 오픈!"이 뜨면 검지 ☝ 를 펴세요.'
-      : '주먹 ✊ 을 쥐고 있는 동안만 시간이 줄어요.<br>0이 되는 순간 예매가 열립니다.';
+      ? '주먹 ✊ 을 쥔 동안만 시간이 흘러요. 손을 펼치면 ✋ 멈춰요.<br>오픈 전에 <b>검지만 ☝ 펴면 부정 예매</b>예요.'
+      : '주먹 ✊ 을 쥔 동안만 시간이 줄어요. 손을 펼치면 ✋ 멈춰요.<br>0 전에 <b>검지만 ☝ 펴면 부정 예매</b>예요.';
   } else {
-    $('qNote').innerHTML = '손을 펴면 시간이 멈춰요.<br><b>주먹 ✊ 을 다시 쥐면</b> 이어서 기다려요.';
+    $('qNote').innerHTML = '손을 펼쳐서 시간이 멈췄어요.<br><b>주먹 ✊ 을 다시 쥐면</b> 이어서 기다려요. (검지만 ☝ 펴면 부정 예매)';
   }
 }
 
@@ -596,7 +607,7 @@ function makeAdvice({ ok, fouls, lates, avg, best, spread }) {
 
   if (fouls) {
     list.push(mode === 'hidden'
-      ? `부정 예매(0.1초보다 빠름)가 <b>${fouls}번</b> 있었어요. 언제 열릴지 <b>짐작하지 말고</b>, "예매 오픈!" 화면을 <b>본 다음</b> 움직이세요.`
+      ? `부정 예매가 <b>${fouls}번</b> 있었어요. 기다리는 동안 검지만 펴지 말고, 언제 열릴지 <b>짐작하지 말고</b>, "예매 오픈!" 화면을 <b>본 다음</b> 움직이세요.`
       : `부정 예매가 <b>${fouls}번</b> 있었어요. 숫자가 <b>0이 된 다음</b> 펴야 해요. 너무 서두르지 마세요.`);
   }
   if (lates) {

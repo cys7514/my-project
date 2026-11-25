@@ -72,14 +72,21 @@ function fingersUp(world) {
 // 손 모양 알아내기
 //  'none'  : 손이 안 보임
 //  'fist'  : 주먹 ✊ (검지 · 중지 · 약지 · 새끼가 모두 접힘, 엄지는 상관없음)
-//  'index' : 검지 펼침 ☝ (검지가 펴짐, 다른 손가락은 상관없음)
-//  'other' : 그 밖의 모양
+//  'point' : 검지만 펼침 ☝ (검지만 펴지고 중지 · 약지 · 새끼는 접힘, 엄지는 상관없음)
+//  'open'  : 손을 펼침 ✋ (검지와 다른 손가락도 펴짐)
+//  'other' : 그 밖의 모양 (검지는 접혔는데 다른 손가락이 펴짐)
+// 'point'와 'open'은 둘 다 검지가 펴진 모양 → isIndexUp()
 export function shape(result) {
   if (!result.landmarks.length) return 'none';
   const [, index, middle, ring, pinky] = fingersUp(result.worldLandmarks[0]);
-  if (index) return 'index';
-  if (!middle && !ring && !pinky) return 'fist';
+  const othersFolded = !middle && !ring && !pinky;
+  if (index) return othersFolded ? 'point' : 'open';
+  if (othersFolded) return 'fist';
   return 'other';
+}
+
+export function isIndexUp(s) {
+  return s === 'point' || s === 'open';
 }
 
 // 손 뼈대 그리기 (펴진 손가락은 손가락 색, 접힌 손가락은 회색)
